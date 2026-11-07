@@ -3,8 +3,12 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
   const u = L.getUser(req); if (!u) return res.status(401).json({ ok: false, reason: 'signin' });
   const b = await L.body(req), ip = L.clientIp(req), day = L.dayKey();
-  const ips = await L.getJson('cfg:ips', []);
-  if (!L.ipAllowed(ip, ips)) return res.status(403).json({ ok: false, reason: 'network' });
+  // Approved-IP check applies to laptop check-ins (typed code) only.
+  // Phones scanning the live QR are often on mobile data, so they are not IP-checked.
+  if (!b.token) {
+    const ips = await L.getJson('cfg:ips', []);
+    if (!L.ipAllowed(ip, ips)) return res.status(403).json({ ok: false, reason: 'network' });
+  }
   const existing = await L.r('HGET', 'att:' + day, u.e);
   if (existing) return res.json({ ok: true, already: true, ts: JSON.parse(existing).ts });
   // throttle wrong guesses: 6 failures / minute / student

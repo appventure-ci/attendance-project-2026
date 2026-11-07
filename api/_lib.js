@@ -14,7 +14,9 @@ const BASE = () => (process.env.PUBLIC_URL || 'http://localhost:3000').replace(/
 
 // ---- Rotating codes (TOTP style) ----
 const W_QR = 8000, W_LET = 4000;
-function qrToken(w) { return w + '.' + hmac('q' + w).toString('hex').slice(0, 16); }
+// Kept short on purpose: a shorter URL means a smaller, coarser QR that scans from further away.
+// The server tries the current and previous 8s window, so the window number isn't included.
+function qrToken(w) { return hmac('q' + w).toString('hex').slice(0, 10); }
 function letters(w) {
   const b = hmac('l' + w); const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I/O
   return A[b[0] % A.length] + A[b[1] % A.length];

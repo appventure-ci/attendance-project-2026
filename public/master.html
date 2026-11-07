@@ -1,7 +1,7 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Attendance Display</title><link rel="stylesheet" href="/style.css">
 <style>body{background:#fff;-webkit-user-select:none}.m{width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.2vh;height:100vh;text-align:center}
-#qr{width:min(58vh,80vw)}#qr svg{width:100%;height:auto;display:block}
+#qr{width:min(58vh,80vw)}#qr svg{width:100%;height:auto;display:block;shape-rendering:crispEdges}
 h1{font-size:4vh;margin:0}.i{font-size:2.6vh;color:var(--sub);margin:0}
 .lt{position:relative;width:15vh;height:15vh}.lt svg{position:absolute;inset:0;transform:rotate(-90deg)}
 .lt b{position:absolute;inset:0;display:grid;place-items:center;font-size:7vh;letter-spacing:.05em;font-weight:600}
@@ -12,10 +12,10 @@ h1{font-size:4vh;margin:0}.i{font-size:2.6vh;color:var(--sub);margin:0}
 <div id="qr"></div>
 <div class="lt"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" fill="none" stroke="#e1dfdd" stroke-width="2.5"/><circle id="ring" cx="18" cy="18" r="16" fill="none" stroke="#0f6cbd" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="100.5" /></svg><b id="L">--</b></div></div>
 <div id="toast"></div><div id="cnt"></div>
-<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="/vendor/qrcode.js"></script>
 <script>
 let since=Date.now()-1000,lastUrl='',off=0,letEnd=0,letLen=4000;
-function draw(url){const q=qrcode(0,'M');q.addData(url);q.make();document.getElementById('qr').innerHTML=q.createSvgTag({cellSize:4,margin:2,scalable:true})}
+function draw(url){const q=qrcode(0,'M');q.addData(url);q.make();document.getElementById('qr').innerHTML=q.createSvgTag({cellSize:4,margin:4,scalable:true})}
 const toast=document.getElementById('toast');let q=[],showing=false;
 function pump(){if(showing||!q.length)return;showing=true;const e=q.shift();
  toast.textContent=`${e.name} signed in at ${new Date(e.ts).toLocaleTimeString()}`;toast.classList.add('on');
