@@ -1,0 +1,36 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Attendance Display</title><link rel="stylesheet" href="/style.css">
+<style>body{background:#fff;-webkit-user-select:none}.m{width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.2vh;height:100vh;text-align:center}
+#qr{width:min(58vh,80vw)}#qr svg{width:100%;height:auto;display:block}
+h1{font-size:4vh;margin:0}.i{font-size:2.6vh;color:var(--sub);margin:0}
+.lt{position:relative;width:15vh;height:15vh}.lt svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.lt b{position:absolute;inset:0;display:grid;place-items:center;font-size:7vh;letter-spacing:.05em;font-weight:600}
+#toast{position:fixed;top:3vh;right:3vh;background:var(--ok);color:#fff;font-size:3vh;padding:2vh 3vh;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);transform:translateY(-200%);transition:transform .35s}
+#toast.on{transform:none}#cnt{position:fixed;bottom:2vh;right:3vh;color:var(--sub);font-size:2vh}</style></head><body>
+<div class="m" id="m"><h1>Robotics Club attendance</h1>
+<p class="i">Scan with your phone, or visit this site on a laptop and type the letters below.</p>
+<div id="qr"></div>
+<div class="lt"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" fill="none" stroke="#e1dfdd" stroke-width="2.5"/><circle id="ring" cx="18" cy="18" r="16" fill="none" stroke="#0f6cbd" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="100.5" /></svg><b id="L">--</b></div></div>
+<div id="toast"></div><div id="cnt"></div>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script>
+let since=Date.now()-1000,lastUrl='',off=0,letEnd=0,letLen=4000;
+function draw(url){const q=qrcode(0,'M');q.addData(url);q.make();document.getElementById('qr').innerHTML=q.createSvgTag({cellSize:4,margin:2,scalable:true})}
+const toast=document.getElementById('toast');let q=[],showing=false;
+function pump(){if(showing||!q.length)return;showing=true;const e=q.shift();
+ toast.textContent=`${e.name} signed in at ${new Date(e.ts).toLocaleTimeString()}`;toast.classList.add('on');
+ setTimeout(()=>{toast.classList.remove('on');setTimeout(()=>{showing=false;pump()},400)},4000)}
+async function tick(){
+ const r=await fetch('/api/master?since='+since);
+ if(r.status===401){document.getElementById('m').innerHTML='<h1>Admin sign-in required</h1><a class="btn" style="width:300px" href="/api/auth/login?return=/master">Sign in with Microsoft</a>';return}
+ const d=await r.json();off=d.now-Date.now();letEnd=d.now+d.letMsLeft;
+ if(d.url!==lastUrl){lastUrl=d.url;draw(d.url)}
+ document.getElementById('L').textContent=d.letters;
+ d.events.forEach(e=>{since=Math.max(since,e.ts);q.push(e)});pump();
+ document.getElementById('cnt').textContent=d.count+' checked in today';
+ setTimeout(tick,Math.min(1000,Math.max(150,d.letMsLeft+30)));
+}
+setInterval(()=>{const left=Math.max(0,letEnd-(Date.now()+off));document.getElementById('ring').style.strokeDashoffset=100.5*(1-left/letLen)},50);
+tick();
+document.addEventListener('click',()=>document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen());
+</script></body></html>

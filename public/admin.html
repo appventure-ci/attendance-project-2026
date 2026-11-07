@@ -1,0 +1,24 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Attendance Admin</title><link rel="stylesheet" href="/style.css"><style>.wrap{max-width:900px}body{-webkit-user-select:text;user-select:text}</style></head><body>
+<main class="wrap" id="app"><div class="card">Loading…</div></main>
+<script>
+const app=document.getElementById('app');let day='';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function load(){
+ const r=await fetch('/api/admin'+(day?'?date='+day:''));
+ if(r.status===401)return app.innerHTML='<div class="card center"><h1>Admin only</h1><a class="btn" href="/api/auth/login?return=/admin">Sign in with Microsoft</a></div>';
+ const d=await r.json();day=d.day;
+ app.innerHTML=`<div class="card row"><h1 style="margin:0;flex:1">Attendance</h1><input type="date" id="dt" value="${d.day}"><a class="btn ghost" style="width:auto" href="/master">Open display</a></div>
+ <div class="card"><b>Present (${d.logs.length})</b><table><tr><th>Time</th><th>Name</th><th>Email</th><th>How</th><th>IP</th></tr>${d.logs.map(l=>`<tr><td>${new Date(l.ts).toLocaleTimeString()}</td><td>${esc(l.name)}</td><td>${esc(l.email)}<div class="flag">${l.flags.map(esc).join('<br>')}</div></td><td>${l.method}</td><td>${esc(l.ip)}</td></tr>`).join('')}</table></div>
+ <div class="card"><b>Absent (${d.absent.length})</b><p class="sub">${d.absent.map(esc).join(', ')||'None'}</p></div>
+ <div class="card"><b>Expected students</b><p class="sub">One school email per line.</p><textarea id="st">${esc(d.students.join('\n'))}</textarea></div>
+ <div class="card"><b>Approved IP addresses</b><p class="sub">One per line. Single IPs or IPv4 ranges like 203.0.113.0/24. Empty means any network is allowed. You are on ${esc(d.myIp)}.</p><textarea id="ip">${esc(d.ips.join('\n'))}</textarea>
+ <button class="btn ghost" id="mine">Add my current IP</button></div>
+ <button class="btn" id="save">Save lists</button>`;
+ document.getElementById('dt').onchange=e=>{day=e.target.value;load()};
+ document.getElementById('mine').onclick=()=>{const t=document.getElementById('ip');t.value=(t.value+'\n'+d.myIp).trim()};
+ document.getElementById('save').onclick=async()=>{const L=id=>document.getElementById(id).value.split('\n');
+  await fetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({students:L('st'),ips:L('ip')})});load()};
+}
+load();
+</script></body></html>

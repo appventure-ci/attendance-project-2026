@@ -1,0 +1,61 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Robotics Club Check-in</title>
+<link rel="stylesheet" href="/style.css"></head><body>
+<main class="wrap" id="app"><div class="card center sub">Loading…</div></main>
+<script>
+const app=document.getElementById('app'),$=(h)=>{app.innerHTML=h};
+const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||matchMedia('(pointer:coarse)').matches;
+const tokenParam=new URLSearchParams(location.search).get('t');
+let pasteAttempts=0,hidden=0,stream,scanning=false;
+document.addEventListener('visibilitychange',()=>{if(document.hidden)hidden++});
+document.addEventListener('contextmenu',e=>e.preventDefault());
+const hdr=(me)=>`<div class="card row"><div class="av">${me.name.split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase()}</div><div><div class="name">${me.name}</div><div class="sub">${me.email}</div></div></div>`;
+const post=(d)=>fetch('/api/checkin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...d,pasteAttempts,hidden})}).then(async r=>({s:r.status,...await r.json()}));
+const MSG={network:'You are not on the club network. Connect to the school Wi-Fi.',wrong:'That code is wrong or has expired. Check the screen.',expired:'That QR code expired. Scan the one on screen now.',slow:'Too many attempts. Wait a minute.',signin:'Please sign in again.'};
+
+function done(me,r){stopCam();const t=new Date(r.ts).toLocaleTimeString();
+ $(hdr(me)+`<div class="card center"><svg class="tick" viewBox="0 0 120 120"><circle cx="60" cy="60" r="48"/><path d="M38 62l16 16 30-34"/></svg><h1>${r.already?'Already checked in':'You’re checked in'}</h1><p class="sub">${t}</p></div>`)}
+
+function stopCam(){scanning=false;stream&&stream.getTracks().forEach(t=>t.stop())}
+
+async function scanView(me,note){
+ $(hdr(me)+`<div class="card"><h1>Scan the screen</h1><p class="sub">${note||'Point your camera at the QR code on the projector.'}</p><video id="v" playsinline muted></video><div class="err" id="e"></div><button class="btn ghost" id="sw">Type the 2-letter code instead</button></div>`);
+ document.getElementById('sw').onclick=()=>{stopCam();codeView(me)};
+ try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});}
+ catch{document.getElementById('e').textContent='Camera blocked. Allow camera access, or type the code.';return}
+ const v=document.getElementById('v');v.srcObject=stream;await v.play();scanning=true;
+ let det=window.BarcodeDetector?new BarcodeDetector({formats:['qr_code']}):null;
+ if(!det){await new Promise(r=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';s.onload=r;document.head.appendChild(s)})}
+ const cv=document.createElement('canvas'),cx=cv.getContext('2d',{willReadFrequently:true});let busy=false;
+ (async function loop(){ if(!scanning)return; if(!busy&&v.videoWidth){busy=true;let txt=null;
+   try{ if(det){const b=await det.detect(v);txt=b[0]&&b[0].rawValue}
+     else{cv.width=v.videoWidth;cv.height=v.videoHeight;cx.drawImage(v,0,0);const q=jsQR(cx.getImageData(0,0,cv.width,cv.height).data,cv.width,cv.height);txt=q&&q.data}}catch{}
+   if(txt){try{const u=new URL(txt);if(u.origin===location.origin&&u.searchParams.get('t')){const r=await post({token:u.searchParams.get('t')});
+      if(r.ok)return done(me,r); document.getElementById('e').textContent=MSG[r.reason]||'Try again.';}}catch{}}
+   busy=false}
+  requestAnimationFrame(loop)})();
+}
+
+function codeView(me){
+ $(hdr(me)+`<div class="card center"><h1>Enter the code</h1><p class="sub">Type the 2 letters shown on the screen.</p><div class="otp"><input id="a" maxlength="1" autocomplete="off" autocapitalize="characters" inputmode="text"><input id="b" maxlength="1" autocomplete="off" autocapitalize="characters"></div><div class="err" id="e"></div><button class="btn" id="go">Check in</button>${mobile?'<button class="btn ghost" id="sw">Scan QR instead</button>':''}</div>`);
+ const a=document.getElementById('a'),b=document.getElementById('b'),e=document.getElementById('e');a.focus();
+ [a,b].forEach((el,i)=>{
+  ['paste','drop','copy','cut'].forEach(ev=>el.addEventListener(ev,x=>{x.preventDefault();pasteAttempts++;e.textContent='Pasting is disabled. Type the letters.'}));
+  el.addEventListener('beforeinput',x=>{if(/paste|drop|history/.test(x.inputType)){x.preventDefault();pasteAttempts++}});
+  el.addEventListener('input',()=>{el.value=el.value.replace(/[^a-z]/gi,'').toUpperCase();if(el.value&&i==0)b.focus();if(a.value&&b.value)go()});
+  el.addEventListener('keydown',x=>{if(x.key==='Backspace'&&!el.value&&i==1)a.focus()})});
+ async function go(){const r=await post({letters:a.value+b.value});if(r.ok)return done(me,r);
+  e.textContent=MSG[r.reason]||'Try again.';a.value=b.value='';a.focus()}
+ document.getElementById('go').onclick=go;
+ const sw=document.getElementById('sw');if(sw)sw.onclick=()=>scanView(me);
+}
+
+(async()=>{
+ const me=await fetch('/api/me').then(r=>r.json());
+ if(!me.email){return $(`<div class="card center"><h1>Robotics Club</h1><p class="sub">Sign in with your school Microsoft account to take attendance.</p><a class="btn" href="/api/auth/login?return=${encodeURIComponent(location.pathname+location.search)}">Sign in with Microsoft</a></div>`)}
+ if(tokenParam){const r=await post({token:tokenParam});if(r.ok)return done(me,r);
+   if(r.reason==='network')return $(hdr(me)+`<div class="card center"><h1>Wrong network</h1><p class="sub">${MSG.network}</p></div>`);
+   return scanView(me,'That link expired. Scan the live QR code on the projector.')}
+ mobile?scanView(me):codeView(me);
+})();
+</script></body></html>
